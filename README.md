@@ -6,7 +6,17 @@ This is a script for deploying Dockerized web applications. It automates the pro
 
 1. Clone this repository: `git clone https://github.com/user/ez-deploy.git`
 2. Navigate to the cloned directory: `cd ez-deploy`
-3. Run the script with your GitHub repository and domain name: `./deploy.sh https://github.com/yourusername/yourrepo.git yourdomain.com`
+3. Set the DOMAIN_OWNER_EMAIL for ssl certificates: `export DOMAIN_OWNER_EMAIL=YOUR_EMAIL`
+4. Run the script with your GitHub repository and domain name: `./deploy.sh https://github.com/yourusername/yourrepo.git yourdomain.com`
+
+## Environment Variables
+
+The script uses the `DOMAIN_OWNER_EMAIL` environment variable for the SSL setup. This should be set to the email address of the domain owner.
+
+Example:
+```bash
+export DOMAIN_OWNER_EMAIL=yourname@yourdomain.com
+```
 
 ## Usage
 
