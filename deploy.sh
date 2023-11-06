@@ -52,14 +52,22 @@ fi
 
 GITHUB_REPO=$1
 FOLDER_NAME=$(basename "$GITHUB_REPO" .git)
+FOLDER_NAME=${FOLDER_NAME//\//_}
 if [[ $NO_WEBSERVER -eq 0 ]]; then
   DOMAIN_NAME=$2
   FOLDER_NAME=$2
+  FOLDER_NAME=${FOLDER_NAME//\//_}
   # Check if the domain name is a subdomain of marvinirwin.com
+  IS_SUBDOMAIN=0
   if [[ $DOMAIN_NAME == *".marvinirwin.com" ]]; then
+    IS_SUBDOMAIN=1
     SUBDOMAIN_NAME=$(echo $DOMAIN_NAME | cut -d'.' -f1)
     DOMAIN_NAME="marvinirwin.com"
     FOLDER_NAME=$SUBDOMAIN_NAME
+  fi
+  NGINX_REDIRECT_SOURCE=$DOMAIN_NAME
+  if [[ $IS_SUBDOMAIN -eq 1 ]]; then
+    NGINX_REDIRECT_SOURCE=$SUBDOMAIN_NAME.$DOMAIN_NAME
   fi
   # Check if the DOMAIN_OWNER_EMAIL environment variable is set
   if [[ -z "${DOMAIN_OWNER_EMAIL}" ]]; then
@@ -70,6 +78,8 @@ if [[ $NO_WEBSERVER -eq 0 ]]; then
 else
   EMAIL='marvin@marvinirwin.com' # replace with your email address
 fi
+
+print_and_copy "$NGINX_REDIRECT_SOURCE"
 
 print_and_copy "Updating apt-get"
 apt-get update || {
@@ -181,16 +191,15 @@ docker stop "$FOLDER_NAME-container" || true
 docker rm "$FOLDER_NAME-container" || true
 
 # Start the Docker container with a health check
-# Start the Docker container
 if [[ $NO_WEBSERVER -eq 0 ]]; then
   # With health check
-  docker run -d --env-file .env --name "$FOLDER_NAME-container" -p "$OPEN_PORT:80" -e PORT=80 --health-cmd='curl -f http://localhost:80 || exit 1' "$FOLDER_NAME-image" || {
+  docker run --network=clone-connection -d --env-file .env --name "$FOLDER_NAME-container" -p "$OPEN_PORT:80" -e PORT=80 --health-cmd='curl -f http://localhost:80 || exit 1' "$FOLDER_NAME-image" || {
     print_and_copy "Failed to run the Docker container"
     exit 1
   }
 else
   # Without health check
-  docker run -d --env-file .env --name "$FOLDER_NAME-container" -p "$OPEN_PORT:80" -e PORT=80 "$FOLDER_NAME-image" || {
+  docker run --network=clone-connection -d --env-file .env --name "$FOLDER_NAME-container" -p "$OPEN_PORT:80" -e PORT=80 "$FOLDER_NAME-image" || {
     print_and_copy "Failed to run the Docker container"
     exit 1
   }
@@ -216,10 +225,10 @@ fi
 if [[ $NO_WEBSERVER -eq 0 ]]; then
   # Nginx configuration
   print_and_copy "Configuring Nginx"
-  cat <<EOF >/etc/nginx/conf.d/$DOMAIN_NAME.conf
+  cat <<EOF >/etc/nginx/conf.d/$NGINX_REDIRECT_SOURCE.conf
 server {
     listen 80;
-    server_name $DOMAIN_NAME;
+    server_name $NGINX_REDIRECT_SOURCE;
 
     location / {
         return 301 https://\$host\$request_uri;
@@ -228,10 +237,10 @@ server {
 
 server {
     listen 443 ssl;
-    server_name $DOMAIN_NAME;
+    server_name $NGINX_REDIRECT_SOURCE;
 
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem;
+    # ssl_certificate /etc/letsencrypt/live/$NGINX_REDIRECT_SOURCE/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/$NGINX_REDIRECT_SOURCE/privkey.pem;
 
     location / {
         proxy_pass http://localhost:$OPEN_PORT;
@@ -245,15 +254,17 @@ EOF
 
   print_and_copy "Nginx configured successfully"
 
-  # Get the SSL certificate
-  print_and_copy "Getting the SSL certificate"
-  if ! [ -d "/etc/letsencrypt/live/$DOMAIN_NAME" ]; then
-    certbot --nginx -d "$DOMAIN_NAME" --non-interactive --agree-tos --email "$EMAIL" || {
-      print_and_copy "Failed to get the SSL certificate"
-      exit 1
-    }
-  fi
-  print_and_copy "SSL certificate obtained successfully"
+# Get the SSL certificate
+print_and_copy "Getting the SSL certificate"
+if ! [ -d "/etc/letsencrypt/live/$NGINX_REDIRECT_SOURCE" ]; then
+  certbot --nginx -d "$NGINX_REDIRECT_SOURCE" --non-interactive --agree-tos --email "$EMAIL" || {
+    print_and_copy "Failed to get the SSL certificate"
+    exit 1
+  }
+fi
+print_and_copy "SSL certificate obtained successfully"
+
+
 
   # Reload Nginx
   print_and_copy "Reloading Nginx"
