@@ -239,8 +239,8 @@ server {
     listen 443 ssl;
     server_name $NGINX_REDIRECT_SOURCE;
 
-    # ssl_certificate /etc/letsencrypt/live/$NGINX_REDIRECT_SOURCE/fullchain.pem;
-    # ssl_certificate_key /etc/letsencrypt/live/$NGINX_REDIRECT_SOURCE/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/$NGINX_REDIRECT_SOURCE/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$NGINX_REDIRECT_SOURCE/privkey.pem;
 
     location / {
         proxy_pass http://localhost:$OPEN_PORT;
