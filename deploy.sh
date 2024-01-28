@@ -138,6 +138,24 @@ if ! command -v nginx &>/dev/null; then
   print_and_copy "Nginx installed successfully"
 fi
 
+# Confirm that the /ez-deploy-volumes directory exists
+if [ ! -d "/ez-deploy-volumes" ]; then
+  print_and_copy "Creating /ez-deploy-volumes directory"
+  mkdir /ez-deploy-volumes || {
+    print_and_copy "Failed to create /ez-deploy-volumes directory"
+    exit 1
+  }
+fi
+
+# Confirm that the /ez-deploy-volumes/$FOLDER_NAME directory exists
+if [ ! -d "/ez-deploy-volumes/$FOLDER_NAME" ]; then
+  print_and_copy "Creating /ez-deploy-volumes/$FOLDER_NAME directory"
+  mkdir /ez-deploy-volumes/$FOLDER_NAME || {
+    print_and_copy "Failed to create /ez-deploy-volumes/$FOLDER_NAME directory"
+    exit 1
+  }
+fi
+
 # Install Certbot
 if ! command -v certbot &>/dev/null; then
   print_and_copy "Installing Certbot"
@@ -193,13 +211,13 @@ docker rm "$FOLDER_NAME-container" || true
 # Start the Docker container with a health check
 if [[ $NO_WEBSERVER -eq 0 ]]; then
   # With health check
-  docker run --network=clone-connection -d --env-file .env --name "$FOLDER_NAME-container" -p "$OPEN_PORT:80" -e PORT=80 --health-cmd='curl -f http://localhost:80 || exit 1' "$FOLDER_NAME-image" || {
+  docker run --network=clone-connection -d --env-file .env --name "$FOLDER_NAME-container" -p "$OPEN_PORT:80" -e PORT=80 --health-cmd='curl -f http://localhost:80 || exit 1' -v /ez-deploy-volumes/$FOLDER_NAME:/ez-deploy-volume "$FOLDER_NAME-image" || {
     print_and_copy "Failed to run the Docker container"
     exit 1
   }
 else
   # Without health check
-  docker run --network=clone-connection -d --env-file .env --name "$FOLDER_NAME-container" -p "$OPEN_PORT:80" -e PORT=80 "$FOLDER_NAME-image" || {
+  docker run --network=clone-connection -d --env-file .env --name "$FOLDER_NAME-container" -p "$OPEN_PORT:80" -e PORT=80 -v /ez-deploy-volumes/$FOLDER_NAME:/ez-deploy-volume "$FOLDER_NAME-image" || {
     print_and_copy "Failed to run the Docker container"
     exit 1
   }
@@ -274,4 +292,5 @@ print_and_copy "SSL certificate obtained successfully"
   }
   print_and_copy "Nginx reloaded successfully"
 fi
+
 
