@@ -240,9 +240,37 @@ else
   kill %1
 fi
 
+# Get the SSL certificate
+print_and_copy "Getting the SSL certificate"
+if ! [ -d "/etc/letsencrypt/live/$NGINX_REDIRECT_SOURCE" ]; then
+  # Nginx configuration without SSL
+  print_and_copy "Configuring Nginx without SSL"
+  cat <<EOF >/etc/nginx/conf.d/$NGINX_REDIRECT_SOURCE.conf
+server {
+    listen 80;
+    server_name $NGINX_REDIRECT_SOURCE;
+
+    location / {
+        proxy_pass http://localhost:$OPEN_PORT;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+
+  # Obtain SSL certificate
+  certbot --nginx -d "$NGINX_REDIRECT_SOURCE" --non-interactive --agree-tos --email "$EMAIL" || {
+    print_and_copy "Failed to get the SSL certificate"
+    exit 1
+  }
+fi
+print_and_copy "SSL certificate obtained successfully"
+
 if [[ $NO_WEBSERVER -eq 0 ]]; then
-  # Nginx configuration
-  print_and_copy "Configuring Nginx"
+  # Nginx configuration with SSL for large file uploads
+  print_and_copy "Configuring Nginx with SSL for large file uploads"
   cat <<EOF >/etc/nginx/conf.d/$NGINX_REDIRECT_SOURCE.conf
 server {
     listen 80;
@@ -260,27 +288,21 @@ server {
     ssl_certificate /etc/letsencrypt/live/$NGINX_REDIRECT_SOURCE/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/$NGINX_REDIRECT_SOURCE/privkey.pem;
 
+    client_max_body_size 20G; # Allow file uploads up to 1GB
+
     location / {
         proxy_pass http://localhost:$OPEN_PORT;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 600s; # Increase timeout for large uploads
+        proxy_connect_timeout 600s; # Increase timeout for large uploads
     }
 }
 EOF
 
-  print_and_copy "Nginx configured successfully"
-
-# Get the SSL certificate
-print_and_copy "Getting the SSL certificate"
-if ! [ -d "/etc/letsencrypt/live/$NGINX_REDIRECT_SOURCE" ]; then
-  certbot --nginx -d "$NGINX_REDIRECT_SOURCE" --non-interactive --agree-tos --email "$EMAIL" || {
-    print_and_copy "Failed to get the SSL certificate"
-    exit 1
-  }
-fi
-print_and_copy "SSL certificate obtained successfully"
+  print_and_copy "Nginx configured for large file uploads successfully"
 
 
 
