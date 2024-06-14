@@ -199,7 +199,8 @@ print_and_copy "Found open port: $OPEN_PORT"
 
 # Build and run the Docker image if there are new commits
 print_and_copy "Building and running the Docker image"
-docker build -t "$FOLDER_NAME-image" . || {
+export DOCKER_BUILDKIT=1
+docker build --memory 3g -t "$FOLDER_NAME-image" . || {
   print_and_copy "Failed to build the Docker image"
   exit 1
 }
